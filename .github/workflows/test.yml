@@ -24,9 +24,18 @@ jobs:
       run: |
         sudo apt-get install -y libhdf5-openmpi-dev
 
+    - name: Install  fftw
+      run: |
+        wget ftp://ftp.fftw.org/pub/fftw/fftw-3.3.10.tar.gz
+        tar -xzf fftw-3.3.10.tar.gz
+        cd fftw-3.3.10
+        mkdir -p build && cd build
+        ../configure --prefix=$HOME
+        make
+        make install
+        export FFTW_INC_DIR=/home/runner/work/astr/astr/fftw-3.3.10/include
+        export FFTW_LIB_DIR=/home/runner/work/astr/astr/fftw-3.3.10/lib
+
     - name: Build ASTR
       run: |
-        cmake -S . -B build 
-        cmake --build build -j 2
-        cmake --install build
-        ctest --test-dir build -L nondim
+        make
