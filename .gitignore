@@ -15,4 +15,5 @@ report.txt
 benchmark/
 workspace*
 fort*
-
+*.mod
+*.sh

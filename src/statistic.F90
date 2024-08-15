@@ -583,12 +583,17 @@ module statistic
     !
     if(present(timerept) .and. timerept) time_beg=ptime() 
     !
-    if(trim(flowtype)=='tgv' .or. trim(flowtype)=='hit') then
+    if(trim(flowtype)=='tgv' .or. trim(flowtype)=='hit' .or. trim(flowtype)=='hit2d') then
       enstophy=enstophycal()
       kenergy =kenergycal()
-      dissipation=diss_rate_cal()
       !
-      if(trim(flowtype)=='hit') then
+      if(trim(flowtype)=='hit2d') then
+        dissipation=diss_rate_cal2d()
+      else 
+      dissipation=diss_rate_cal()
+      endif
+      !
+      if(trim(flowtype)=='hit'  .or. trim(flowtype)=='hit2d') then
         !
         call turbstats
         !
@@ -790,7 +795,7 @@ module statistic
       !
       if(linit) then
         !
-        if(trim(flowtype)=='tgv' .or. trim(flowtype)=='hit') then
+        if(trim(flowtype)=='tgv' .or. trim(flowtype)=='hit' .or. trim(flowtype)=='hit2d') then
           fstitle='nstep time kenergy enstophy dissipation'
         elseif(trim(flowtype)=='channel') then
           fstitle='nstep time massflux fbcx forcex wrms'
@@ -808,14 +813,14 @@ module statistic
           fstitle='nstep time maxq1 maxq2 maxq3 maxq4 maxq5'
         endif
         !
-        call listinit(filename='flowstate.dat',handle=hand_fs, &
+        call listinit(filename='log/flowstate.dat',handle=hand_fs, &
                       firstline=trim(fstitle))
         !
         linit=.false.
         !
       endif
       !
-      if(trim(flowtype)=='tgv' .or. trim(flowtype)=='hit') then
+      if(trim(flowtype)=='tgv' .or. trim(flowtype)=='hit' .or. trim(flowtype)=='hit2d') then
         call listwrite(hand_fs,kenergy,enstophy,dissipation)
       elseif(trim(flowtype)=='channel') then
         call listwrite(hand_fs,massflux,fbcx,force(1),wrms)
@@ -845,7 +850,7 @@ module statistic
       !
       if(nstep==maxstep) then
         close(hand_fs)
-        print*,' << flowstate.dat'
+        print*,' << log/flowstate.dat'
       endif
       !
     endif
@@ -1067,6 +1072,48 @@ module statistic
   !+-------------------------------------------------------------------+
   !| The end of the subroutine diss_rate_cal.                          |
   !+-------------------------------------------------------------------+
+  !
+  function diss_rate_cal2d() result(vout)
+    ! TODO: new adaptation
+    !
+    use commvar,  only : im,jm,km,ia,ja,ka,reynolds
+    use commarray,only : tmp,dvel
+    use fludyna,  only : miucal
+    !
+    real(8) :: vout
+    !
+    ! local data
+    integer :: i,j,k
+    real(8) :: var1,miu
+    real(8) :: du11,du12,du21,du22,s11,s12,s22,div
+    !
+    vout=0.d0
+    !
+    do j=1,jm
+    do i=1,im
+      ! 
+      miu=miucal(tmp(i,j,k))/reynolds
+      !
+      du11=dvel(i,j,k,1,1); du12=dvel(i,j,k,1,2); 
+      du21=dvel(i,j,k,2,1); du22=dvel(i,j,k,2,2);
+      !
+      s11=du11; s12=0.5d0*(du12+du21);s22=du22;
+      !
+      div=s11+s22
+      !
+      var1=2.d0*miu*(s11**2+s22**2+2.d0*s12**2-0.5d0*div**2)
+      !
+      vout=vout+var1
+      !
+    enddo
+    enddo
+    !
+    vout=psum(vout)/dble(ia*ja)
+    !
+    return
+    !
+  end function diss_rate_cal2d
+  !
   !+-------------------------------------------------------------------+
   !| This function is to return rms spanwise velocity fluctuation.     |
   !+-------------------------------------------------------------------+

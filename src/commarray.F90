@@ -31,6 +31,8 @@ module commarray
   real(8),allocatable,dimension(:,:,:) :: tke,omg,miut,res12,ssf
   real(8),allocatable,dimension(:,:,:,:) :: dtke,domg
   !
+  real(8),allocatable,dimension(:) :: Ak,phik
+  !
   !+---------------------+---------------------------------------------+
   !|                   x | coordinates.                                |
   !|               jacob | geometrical Jacobian.                       |
@@ -42,8 +44,7 @@ module commarray
   !|                 tmp | temperature.                                |
   !|                 vel | velocity.                                   |
   !|                 spc | species.                                    |
-  !|            lenspg_* | length of sponge layer                      |
-  !|              xspg_* | starting x,y,z of sponge layer              |
+  !|              lspg_* | length of sponge layer                      |
   !|            nodestat | node status: fluid or solid                 |
   !|             bnorm_* | the vector of boundary normal direction,    |
   !|                     | towards the inside of the domain            |

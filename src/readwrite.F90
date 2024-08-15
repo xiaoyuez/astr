@@ -96,6 +96,7 @@ module readwrite
     if(lio) then
       !
       call system('mkdir testout/')
+      call system('mkdir log/')
       call system('mkdir outdat/')
       call system('mkdir bakup/')
       !
@@ -155,6 +156,8 @@ module readwrite
         typedefine='                  Taylor-Green Vortex flow'
       case('hit')
         typedefine='          homogeneous isotropic turbulence'
+      case('hit2d')
+        typedefine='       2d homogeneous isotropic turbulence'
       case('jet')
         typedefine='                                  Jet flow'
       case('accutest')
@@ -765,6 +768,171 @@ module readwrite
   !| The end of the subroutine readinput.                              |
   !+-------------------------------------------------------------------+
   !
+  subroutine readinput_serial
+    !
+    use commvar
+    use commvar, only : ia,ja,ka,lihomo,ljhomo,lkhomo,conschm,difschm, &
+                        nondimen,diffterm,ref_tem,ref_vel,ref_len,     &
+                        ref_den,reynolds,mach,                         &
+                        num_species,flowtype,lfilter,alfa_filter,      &
+                        lreadgrid,lfftk,gridfile,kcutoff,              &
+                        ninit,rkscheme,spg_i0,spg_im,spg_j0,spg_jm,    &
+                        spg_k0,spg_km,lchardecomp,                     &
+                        recon_schem,lrestart,limmbou,solidfile,        &
+                        bfacmpld,shkcrt,turbmode,schmidt,ibmode,       &
+                        ltimrpt,testmode,xcav_left,xcav_right,         &
+                        xcav2_left,xcav2_right,ycav_upper       
+    use cmdefne, only : readkeyboad
+    use bc,      only : bctype,twall,xslip,turbinf,xrhjump,angshk
+    !
+#ifdef COMB
+    use thermchem,only: chemrep,chemread,thermdyn
+    logical :: lfex
+#endif
+    !
+    ! local data
+    character(len=64) :: inputfile
+    character(len=5) :: char
+    integer :: n,fh,i
+    !
+    testmode='....'
+    inputfile='datin/input'
+    !
+    call readkeyboad(inputfile)
+    !
+    call readkeyboad(testmode)
+    !
+    fh=get_unit()
+    !
+    open(fh,file=trim(inputfile),action='read')
+    read(fh,'(////)')
+    read(fh,*)flowtype
+    read(fh,'(/)')
+    read(fh,*)ia,ja,ka
+    read(fh,'(/)')
+    read(fh,*)lihomo,ljhomo,lkhomo
+    write(*,'(A)',advance='no')'  ** homogeneous direction: '
+    if(lihomo) write(*,'(A)',advance='no')'i,'
+    if(ljhomo) write(*,'(A)',advance='no')' j,'
+    if(lkhomo) write(*,'(A)')' k'
+    read(fh,'(/)')
+#ifdef COMB
+    read(fh,*)nondimen,diffterm,lfilter,lreadgrid,lfftk,limmbou,ltimrpt,lcomb
+#else
+    read(fh,*)nondimen,diffterm,lfilter,lreadgrid,lfftk,limmbou,ltimrpt
+#endif
+    read(fh,'(/)')
+    read(fh,*)lrestart
+    read(fh,'(/)')
+    read(fh,*)alfa_filter,kcutoff
+    !
+#ifdef COMB
+    read(fh,'(//)')
+#else 
+    if(nondimen) then
+      read(fh,'(/)')
+      read(fh,*)ref_tem,reynolds,mach
+    else
+      read(fh,'(/)')
+      read(fh,*)ref_tem,ref_vel,ref_len,ref_den
+    endif
+#endif
+    !
+    read(fh,'(/)')
+
+#ifdef COMB
+    read(fh,*)conschm,difschm,rkscheme,odetype
+#else 
+    read(fh,*)conschm,difschm,rkscheme
+#endif
+    read(fh,'(/)')
+    read(fh,*)recon_schem,lchardecomp,bfacmpld,shkcrt
+    read(fh,'(/)')
+#ifdef COMB
+    read(fh,'()')
+#else 
+    read(fh,*)num_species
+    if(num_species>0) then
+      allocate(schmidt(num_species))
+      backspace(fh)
+      read(fh,*)num_species,(schmidt(i),i=1,num_species)
+    endif
+#endif
+    read(fh,'(/)')
+    read(fh,*)turbmode,iomode
+    read(fh,'(/)')
+    do n=1,6
+      read(fh,*)bctype(n)
+      if(bctype(n)==41) then
+        backspace(fh)
+        read(fh,*)bctype(n),twall(n)
+      endif
+      if(bctype(n)==411) then
+        backspace(fh)
+        read(fh,*)bctype(n),xslip,twall(n)
+      endif
+      if(bctype(n)==421) then
+        backspace(fh)
+        read(fh,*)bctype(n),xslip
+      endif
+      if(bctype(n)==11) then
+        backspace(fh)
+        read(fh,*)bctype(n),turbinf
+      endif
+      if(bctype(n)==51) then
+        if(trim(flowtype)=='swbli') then
+          backspace(fh)
+          read(fh,*)bctype(n),xrhjump,angshk
+        endif
+      endif
+    enddo
+    read(fh,'(/)')
+    read(fh,*)ninit
+    read(fh,'(/)')
+    read(fh,*)spg_i0,spg_im,spg_j0,spg_jm,spg_k0,spg_km
+    read(fh,'(/)')
+    read(fh,'(A)')gridfile
+    if(limmbou) then
+      read(fh,'(/)')
+      read(fh,*)ibmode,solidfile
+      if(trim(solidfile)=='cavity') then
+         read(fh,*)xcav_left,xcav_right,ycav_upper
+       endif
+       if(trim(solidfile)=='2cavity') then
+         read(fh,*)xcav_left,xcav_right,xcav2_left,xcav2_right,ycav_upper
+       endif
+    endif
+#ifdef COMB
+    if(.not.nondimen) then
+      read(fh,'(/)')
+      read(fh,'(A)')chemfile  
+      if(len(trim(chemfile))>1) then
+        inquire(file=trim(chemfile),exist=lfex)
+        !
+        if(.not. lfex) then
+          print*,' !! Error ',trim(chemfile),' not exist !!'
+          stop
+        endif
+        !
+      else
+        print*,' !! Error chemfile not provided in input !!'
+          stop
+      endif
+    endif 
+    !
+#endif
+    close(fh)
+    print*,' >> ',trim(inputfile),' ... done'
+    !
+    im=ia
+    jm=ja
+    km=ka
+  !
+  end subroutine readinput_serial
+  !+-------------------------------------------------------------------+
+  !| The end of the subroutine readinput.                              |
+  !+-------------------------------------------------------------------+
+  !
   !+-------------------------------------------------------------------+
   !| This subroutine is used to read a file that is sued to control    |
   !| computation.                                                      |
@@ -814,6 +982,49 @@ module readwrite
     call bcast(deltat)
     !
   end subroutine readcont
+  !+-------------------------------------------------------------------+
+  !| The end of the subroutine readcont.                               |
+  !+-------------------------------------------------------------------+
+  !
+  subroutine readic
+    !
+    use commvar, only: ickmax,forcek,icamplitude,lforce,forceamp,numftheta,&
+                      icsolenoidal,icdilatational,forcekT
+    use parallel,only: bcast
+    !
+    ! local data
+    character(len=64) :: inputfile
+    integer :: fh
+    !
+    inputfile='datin/ic'
+    !
+    if(mpirank==0) then
+      !
+      fh=get_unit()
+      !
+      open(fh,file=trim(inputfile),action='read')
+      read(fh,'(////)')
+      read(fh,*)ickmax,icamplitude,icsolenoidal,icdilatational
+      read(fh,'(/)')
+      read(fh,*)lforce
+      read(fh,'(/)')
+      read(fh,*)forcek,forceamp,numftheta,forcekT
+      close(fh)
+      print*,' >> ',trim(inputfile),' ... done'
+      !
+    endif
+    !
+    call bcast(ickmax)
+    call bcast(icamplitude)
+    call bcast(icsolenoidal)
+    call bcast(icdilatational)
+    call bcast(lforce)
+    call bcast(forcek)
+    call bcast(forceamp)
+    call bcast(numftheta)
+    call bcast(forcekT)
+    !
+  end subroutine readic
   !+-------------------------------------------------------------------+
   !| The end of the subroutine readcont.                               |
   !+-------------------------------------------------------------------+
@@ -1223,10 +1434,12 @@ module readwrite
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine readflowini3d
     !
-    use commvar,   only : im,jm,km,num_species,time,roinf,tinf,pinf
-    use commarray, only : rho,vel,prs,tmp,spc
+    use commvar,   only : im,jm,km,num_species,time,roinf,tinf,pinf,  ia,ja,ka
+    use commarray, only : rho,vel,prs,tmp,spc,dvel
     use hdf5io
     use fludyna,   only : thermal
+    use comsolver, only : grad
+    use parallel,  only : psum,pmax,pmin
 #ifdef COMB
     use thermchem, only: spcindex
 #endif
@@ -1235,6 +1448,7 @@ module readwrite
     !
     integer :: i,j,k,jsp
     character(len=3) :: spname
+    real(8) :: div,div_min,div_max,div_avg
     ! real(8) :: time_initial
     !can be used to start premixed case, but not ready yet
     !
@@ -1269,6 +1483,34 @@ module readwrite
     enddo
     enddo
     !
+    !
+    dvel(0:im,0:jm,0:km,1,:)=grad(vel(:,:,:,1))
+    dvel(0:im,0:jm,0:km,2,:)=grad(vel(:,:,:,2))
+    dvel(0:im,0:jm,0:km,3,:)=grad(vel(:,:,:,3))
+    !
+    div=0.d0
+    div_min= 1.d10
+    div_max=-1.d10
+    div_avg=0.d0
+    !
+    do k=1,km
+    do j=1,jm
+    do i=1,im
+      div=dvel(i,j,k,1,1)+dvel(i,j,k,2,2)+dvel(i,j,k,3,3)
+      !
+      div_avg=div_avg+div
+      div_min=min(div_min,div)
+      div_max=max(div_max,div)
+    enddo
+    enddo
+    enddo
+    !
+    div_avg=psum(div_avg)/dble(ia*ja*ka)
+    div_min=pmin(div_min)
+    div_max=pmax(div_max)
+    !
+    if(lio) print*,' ** velocity divgence, average:',div_avg,' min:',div_min,' max:',div_max
+    !
     ! initialize species
 ! #ifdef COMB
     ! phi = 0.4 
@@ -1281,6 +1523,104 @@ module readwrite
   end subroutine readflowini3d
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! End of subroutine readflowini3d.
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !!
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! This subroutine is used to read a initial flow filed. Developped by L.C.S.
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine readflowini3dvel
+    !
+    use commvar,   only : im,jm,km,num_species,time,roinf,tinf,pinf,  ia,ja,ka
+    use commarray, only : rho,vel,prs,tmp,spc,dvel
+    use hdf5io
+    use fludyna,   only : thermal
+    use comsolver, only : grad
+    use parallel,  only : psum,pmax,pmin
+#ifdef COMB
+    use thermchem, only : spcindex
+#endif
+    !
+    ! local data
+    !
+    integer :: i,j,k,jsp
+    character(len=3) :: spname
+    real(8) :: div,div_min,div_max,div_avg
+    ! real(8) :: time_initial
+    !can be used to start premixed case, but not ready yet
+    !
+    call h5io_init(filename='datin/flowini3d.h5',mode='read')
+    ! 
+    ! call h5read(varname='time',var=time_initial)
+    call h5read(varname='u1', var=vel(0:im,0:jm,0:km,1),mode='h')
+    call h5read(varname='u2', var=vel(0:im,0:jm,0:km,2),mode='h')
+    call h5read(varname='u3', var=vel(0:im,0:jm,0:km,3),mode='h')
+    !
+    ! rho=roinf
+    ! prs=pinf
+    ! tmp=tinf
+    do jsp=1,num_species
+      write(spname,'(i3.3)')jsp
+      call h5read(varname='sp'//spname,var=spc(0:im,0:jm,0:km,jsp),mode='h')
+    enddo
+    !
+    call h5io_end
+    !
+    do k=0,km
+    do j=0,jm
+    do i=0,im
+      !
+      rho(i,j,k) = roinf
+      tmp(i,j,k) = tinf
+      prs(i,j,k) =thermal(density=rho(i,j,k),temperature=tmp(i,j,k), &
+                          species=spc(i,j,k,:)) 
+
+    enddo
+    enddo
+    enddo
+    !
+    !
+    dvel(0:im,0:jm,0:km,1,:)=grad(vel(:,:,:,1))
+    dvel(0:im,0:jm,0:km,2,:)=grad(vel(:,:,:,2))
+    dvel(0:im,0:jm,0:km,3,:)=grad(vel(:,:,:,3))
+    !
+    div=0.d0
+    div_min= 1.d10
+    div_max=-1.d10
+    div_avg=0.d0
+    !
+    do k=1,km
+    do j=1,jm
+    do i=1,im
+      div=dvel(i,j,k,1,1)+dvel(i,j,k,2,2)+dvel(i,j,k,3,3)
+      !
+      if(isnan(div))then
+        print* , i,j,k,'div is nan'
+      endif
+      div_avg=div_avg+div
+      div_min=min(div_min,div)
+      div_max=max(div_max,div)
+    enddo
+    enddo
+    enddo
+    !
+    div_avg=psum(div_avg)/dble(ia*ja*ka)
+    div_min=pmin(div_min)
+    div_max=pmax(div_max)
+    !
+    if(lio) print*,' ** velocity divgence, average:',div_avg,' min:',div_min,' max:',div_max
+    !
+    ! initialize species
+! #ifdef COMB
+    ! phi = 0.4 
+    ! spc(0:im,0:jm,0:km,:)=0.d0
+    ! spc(0:im,0:jm,0:km,spcindex('O2'))=0.2302d0
+    ! spc(0:im,0:jm,0:km,spcindex('H2'))=0.0116d0
+    ! spc(0:im,0:jm,0:km,spcindex('N2'))=0.7582d0
+! #endif
+    !
+  end subroutine readflowini3dvel
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! End of subroutine readflowini3dvel.
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !!
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

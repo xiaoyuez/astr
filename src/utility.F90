@@ -432,18 +432,45 @@ module utility
   !| -------------                                                     |
   !| 17-Aug-2023: Created by J. Fang @ Appleton                        |
   !+-------------------------------------------------------------------+
-  subroutine listwrite(handle,var1,var2,var3,var4,var5,var6,var7,var8,var9,var10,var11,var12)
+  subroutine listwrite(handle,var1,var2,var3,var4,var5,var6,var7,var8,var9,var10,&
+                        var11,var12,var13,var14,var15,var16,var17)
     !
     use commvar, only: nstep,time,ref_tim
     !
     integer,intent(in) :: handle
     real(8),intent(in),optional :: var1,var2,var3,var4,var5,var6,      &
-                                   var7,var8,var9,var10,var11,var12
-
+                                   var7,var8,var9,var10,var11,var12,   &
+                                   var13,var14,var15,var16,var17
     !
-    if(present(var12)) then
-      write(handle,"(1X,I20,13(1X,E20.13E2))")nstep,time/ref_tim,       &
-           var1,var2,var3,var4,var5,var6,var7,var8,var9,var10,var11,var12
+    if(present(var17)) then
+      write(handle,"(1X,I20,18(1X,E20.13E2))")nstep,time/ref_tim,var1,var2,     &
+                                          var3,var4,var5,var6,var7,     &
+                                          var8,var9,var10,var11,var12,  &
+                                          var13,var14,var15,var16,var17
+    elseif(present(var16)) then
+      write(handle,"(1X,I20,17(1X,E20.13E2))")nstep,time/ref_tim,var1,var2,     &
+                                          var3,var4,var5,var6,var7,     &
+                                          var8,var9,var10,var11,var12,  &
+                                          var13,var14,var15,var16
+    elseif(present(var15)) then
+      write(handle,"(1X,I20,16(1X,E20.13E2))")nstep,time/ref_tim,var1,var2,     &
+                                          var3,var4,var5,var6,var7,     &
+                                          var8,var9,var10,var11,var12,  &
+                                          var13,var14,var15
+    elseif(present(var14)) then
+      write(handle,"(1X,I20,15(1X,E20.13E2))")nstep,time/ref_tim,var1,var2,     &
+                                          var3,var4,var5,var6,var7,     &
+                                          var8,var9,var10,var11,var12,  &
+                                          var13,var14
+    elseif(present(var13)) then
+      write(handle,"(1X,I20,14(1X,E20.13E2))")nstep,time/ref_tim,var1,var2,     &
+                                          var3,var4,var5,var6,var7,     &
+                                          var8,var9,var10,var11,var12,  &
+                                          var13
+    elseif(present(var12)) then
+      write(handle,"(1X,I20,13(1X,E20.13E2))")nstep,time/ref_tim,var1,var2,     &
+                                          var3,var4,var5,var6,var7,     &
+                                          var8,var9,var10,var11,var12
     elseif(present(var11)) then
       write(handle,"(1X,I20,12(1X,E20.13E2))")nstep,time/ref_tim,       &
                  var1,var2,var3,var4,var5,var6,var7,var8,var9,var10,var11

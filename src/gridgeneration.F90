@@ -30,14 +30,24 @@ module gridgeneration
     if(lreadgrid) then
       call readgrid(trim(gridfile))
     else
-      if(trim(flowtype)=='tgv') then
-        call gridcube(ref_len*2.d0*pi,ref_len*2.d0*pi,ref_len*2.d0*pi)
+      if(flowtype(1:3)=='tgv') then
+        if(nondimen) then
+          call gridcube(2.d0*pi,2.d0*pi,2.d0*pi)
+        elseif(trim(flowtype)=='tgv') then
+          call gridcube(ref_len*2.d0*pi,ref_len*2.d0*pi,ref_len*2.d0*pi)
+        else
+          call gridcube(ref_len*2.d0*pi,ref_len*2.d0*pi,ref_len*2.d0*pi)
+        endif 
       elseif(trim(flowtype)=='jet') then
         call gridjet
       elseif(trim(flowtype)=='hit') then
         call gridcube(2.d0*pi,2.d0*pi,2.d0*pi)
       elseif(trim(flowtype)=='tgvflame') then
         call gridcube(2.d0*pi*1.d-3,2.d0*pi*1.d-3,2.d0*pi*1.d-3)
+      elseif(trim(flowtype)=='hit2d') then
+        call gridsquare(2.d0*pi,2.d0*pi)
+      elseif(trim(flowtype)=='hitflame') then
+        call gridhitflame(mode='cuboid')
       elseif(trim(flowtype)=='2dvort') then
         call gridcube(20.d0,10.d0,1.d0)
       elseif(trim(flowtype)=='accutest') then
@@ -260,6 +270,39 @@ module gridgeneration
     if(lio) print*,' ** cubic grid generated',lx,ly,lz
     !
   end subroutine gridcube
+  !+-------------------------------------------------------------------+
+  !| The end of the subroutine gridcube.                               |
+  !+-------------------------------------------------------------------+
+    !
+  subroutine gridsquare(lx,ly)
+    !
+    use commvar,  only : im,jm,gridfile,ia,ja
+    use parallel, only : ig0,jg0,kg0,lio
+    use commarray,only : x
+    use hdf5io
+    !
+    ! arguments
+    real(8),intent(in) :: lx,ly
+    !
+    ! local data
+    integer :: i,j,k
+    !
+    do j=0,jm
+    do i=0,im
+      x(i,j,0,1)=lx/real(ia,8)*real(i+ig0,8)
+      if(ja==0) then
+        x(i,j,0,2)=ly
+      else
+        x(i,j,0,2)=ly/real(ja,8)*real(j+jg0,8)
+      endif
+      x(i,j,0,3) = 0.d0
+      !
+    enddo
+    enddo
+    !
+    if(lio) print*,' ** square grid generated'
+    !
+  end subroutine gridsquare
   !+-------------------------------------------------------------------+
   !| The end of the subroutine gridcube.                               |
   !+-------------------------------------------------------------------+

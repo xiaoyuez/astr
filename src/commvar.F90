@@ -179,6 +179,11 @@ module commvar
   character(len=4) :: testmode
   real(8) :: xcav_left,xcav_right,xcav2_left,xcav2_right,ycav_upper
   !
+  integer :: ickmax, forcek, numftheta
+  logical :: lforce
+  !
+  real(8) :: icamplitude, forceamp,icsolenoidal,icdilatational,forcekT
+  !
 #ifdef COMB
   logical :: lcomb
   character(len=255) :: chemfile

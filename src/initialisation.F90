@@ -32,8 +32,8 @@ module initialisation
     use commvar,  only: flowtype,nstep,time,filenumb,fnumslic,ninit,   &
                         lrestart,lavg,turbmode,ymax
     use commarray,only: vel,rho,prs,spc,q,tke,omg
-    use readwrite,only: readcont,readflowini3d,readflowini2d,readflowini1d,          &
-                        readcheckpoint,readmeanflow,readmonc,writeflfed
+    use readwrite,only: readcont,readflowini3d,readflowini3dvel,readflowini2d,readflowini1d,&
+                        readcheckpoint,readmeanflow,readmonc,writeflfed, readic
     use fludyna,  only: updateq
     use statistic,only: nsamples
     use bc,       only: ninflowslice,turbinf
@@ -54,6 +54,18 @@ module initialisation
       if(ninit==3) then
         !
         call readflowini3d
+        !
+        ! call blcorrect
+        ! vel(:,:,:,2)=0.d0
+        !
+        if(trim(turbmode)=='k-omega') then
+          tke=0.d0
+          omg=0.d0
+        endif
+        !
+      elseif(ninit==6) then
+        !
+        call readflowini3dvel
         !
         ! call blcorrect
         ! vel(:,:,:,2)=0.d0
@@ -142,6 +154,8 @@ module initialisation
       endif
       !
     endif
+    !
+    call readic
     !
     if(lio) print*,' ** flowfield initialised.'
     !
