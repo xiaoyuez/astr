@@ -10086,6 +10086,147 @@ module pp
     !
   end subroutine instantspectraskewness
   !
+  subroutine instantPtheta2D(thefilenumb)
+ 
+    use singleton
+    use readwrite, only : readinput
+    use commvar,only : time,nstep,im,jm,km,hm,ia,ja,ka
+    use commarray, only : x,vel,dvel
+    use hdf5io
+    use parallel,  only : dataswap, mpisizedis,parapp,parallelini,mpistop,mpirank
+    use comsolver, only : solvrinit,grad
+    use solver,    only : refcal
+    use geom,      only : geomcal
+    use gridgeneration
+    use fludyna, only : miucal
+    use utility, only : listinit, listwrite
+    ! arguments
+    integer,intent(in) :: thefilenumb
+    character(len=128) :: infilename
+    character(len=4) :: stepname
+    character(len=128) :: outfilename
+    character(len=1) :: modeio
+    integer :: i,j
+    integer :: hand_a, hand_b
+    !
+    real(8), allocatable, dimension(:,:,:) :: omega,theta,psi,phi,prstheta,tmp,rho
+    real(8):: sumprstheta,disspc, dissps,miu,omegarms,rhorms,Ek,rho_0
+    call readinput
+    !
+    call mpisizedis
+    if(mpirank == 0) then
+      print*, '** mpisizedis done!'
+    endif
+    !
+    call parapp
+    if(mpirank == 0) then
+      print*, '** parapp done!'
+    endif
+    !
+    call parallelini
+    if(mpirank == 0) then
+      print*, '** parallelini done!'
+    endif
+    !
+    call refcal
+    if(mpirank == 0) then
+      print*, '** refcal done!'
+    endif
+    !
+    !
+    modeio='h'
+    !
+    if(mpirank == 0) then
+      print *, "ia:",ia,",ja:",ja,'ka:',ka
+    endif 
+    !
+    allocate(x(-hm:im+hm,-hm:jm+hm,-hm:hm,1:3) )
+    allocate(vel(-hm:im+hm,-hm:jm+hm,-hm:hm,1:3))
+    allocate(dvel(0:im,0:jm,0:0,1:3,1:2))
+    allocate(omega(1:im,1:jm,0:0),theta(1:im,1:jm,0:0),psi(1:im,1:jm,0:0),phi(1:im,1:jm,0:0))
+    allocate(prs(-hm:im+hm,-hm:jm+hm,-hm:hm))
+    allocate(tmp(-hm:im+hm,-hm:jm+hm,-hm:hm))
+    allocate(rho(-hm:im+hm,-hm:jm+hm,-hm:hm))
+    allocate(prstheta(1:im,i:jm,0:0))
+    
+    !
+    call gridcube(2.d0*pi,2.d0*pi,0.d0)
+    !
+    call geomcal
+    !
+    write(stepname,'(i4.4)')thefilenumb
+    infilename='outdat/flowfield'//stepname//'.'//modeio//'5'
+    !
+    call h5io_init(filename=infilename,mode='read')
+    !
+    call h5read(varname='u1', var=vel(0:im,0:jm,0:km,1),mode = modeio)
+    call h5read(varname='u2', var=vel(0:im,0:jm,0:km,2),mode = modeio)
+    call h5read(varname='p', var=prs(0:im,0:jm,0:km),mode = modeio)
+    call h5read(varname='t',var=tmp(0:im,0:jm,0:km),mode = modeio)
+    call h5read(varname='ro',var=rho(0:im,0:jm,0:km),mode = modeio)
+    call h5read(varname='time',var=time)
+    call h5read(varname='nstep',var=nstep)
+    !
+    call h5io_end
+    !
+    vel(0:im,0:jm,0:km,3) = 0.d0
+    sumprstheta = 0.d0
+    disspc = 0.d0
+    dissps = 0.d0
+    Etheta = 0.d0
+    Ek = 0.d0
+    omegarms = 0.d0
+    rhorms = 0.d0
+    rho_0 = 1.d0
+    !
+    !
+    if(mpirank == 0) then
+      print *, "Swap velocity"
+    endif
+    !
+    call dataswap(vel)
+    !
+    call solvrinit
+    !
+    if(mpirank == 0) then
+      print *, "Calculate gradient"
+    endif
+    dvel(:,:,:,:,1)=grad(vel(:,:,:,1))
+    dvel(:,:,:,:,2)=grad(vel(:,:,:,2))
+    !
+    omega(:,:,0) = dvel(:,:,:,2,1) - dvel(:,:,:,1,2)
+    theta(:,:,0) = dvel(:,:,:,1,1) + dvel(:,:,:,2,2)
+    prstheta(:,:,0) = prs(:,:,0) * theta(:,:,0)
+    do i=1,im
+    do j=1,jm
+
+    miu = miucal(tmp(i,j,0))/reynolds
+    disspc = disspc + 4/3 * miu * theta(i,j,0)**2
+    dissps = dissps + miu * abs(omega(i,j,0))**2
+    omegarms = omegarms + abs(omega(i,j,0))**2
+    rhorms = rhorms + (rho(i,j,0)-rho_0)**2
+    !
+    enddo
+    enddo
+    
+    sumprstheta = psum(sumprstheta)/(ia*ja*1.d0)
+    disspc = psum(disspc)/(ia*ja*1.d0)
+    dissps = psum(dissps)/(ia*ja*1.d0)
+    rhorms = psum(rhorms)/(ia*ja*1.d0)
+    omegarms = psum(omegarms)/(ia*ja*1.d0)
+    if (mpirank == 0) then
+      outfilename = 'pp/velgradnew'//stepname//'.dat'
+      call listinit(filename=outfilename,handle=hand_a, &
+                        firstline='nstep time sumprstheta disspc dissps omegarms rhorms')
+      call listwrite(hand_a,sumprstheta,disspc,dissps,omegarms, rhorms)
+
+      print*,' <<< pp/velgradnew'//stepname//'.dat ... done.'
+    endif
+
+    call mpistop
+    deallocate(x,vel,dvel,prs,tmp,rho,omega,theta,psi,phi,prstheta)
+  end subroutine instantPtheta2D
+
   !
   subroutine instantvelgradient(thefilenumb)
     !
