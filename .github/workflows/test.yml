@@ -1,0 +1,41 @@
+name: build
+on: 
+  push:
+    branches:
+     - main
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+    - uses: actions/checkout@v4
+
+    - name: Install openmpi
+      run: |
+        sudo apt-get install -y openmpi-bin libopenmpi-dev
+
+    - name: Install  HDF5
+      run: |
+        sudo apt-get install -y libhdf5-openmpi-dev
+
+    - name: Install  fftw
+      run: |
+        wget ftp://ftp.fftw.org/pub/fftw/fftw-3.3.10.tar.gz
+        tar -xzf fftw-3.3.10.tar.gz
+        cd fftw-3.3.10
+        mkdir -p build && cd build
+        ../configure --prefix=$HOME
+        make
+        make install
+        export FFTW_INC_DIR=/home/runner/work/astr/astr/fftw-3.3.10/include
+        export FFTW_LIB_DIR=/home/runner/work/astr/astr/fftw-3.3.10/lib
+
+    - name: Build ASTR
+      run: |
+        make
